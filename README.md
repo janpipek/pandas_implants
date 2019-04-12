@@ -1,2 +1,2 @@
-# pandas_experimental_types
+# pandas_implants
 Experimental types for pandas
