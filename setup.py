@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
 
-VERSION = "0.0.1"
+from pandas_implants import __version__
 
 options = dict(
     name='pandas_implants',
-    version=VERSION,
+    version=__version__,
     packages=find_packages(),
     license='MIT',
     description='Experimental types for pandas.',
@@ -15,3 +15,5 @@ options = dict(
     install_requires = ['pandas'],
     python_requires=">=3.6",
 )
+
+setup(**options)
