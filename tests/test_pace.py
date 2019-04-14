@@ -13,8 +13,8 @@ def data():
 
 
 # https://pandas.pydata.org/pandas-docs/stable/development/extending.html#testing-extension-arrays
-#class TestConstructors(base.BaseConstructorsTests):
-#    pass
+class TestConstructors(base.BaseConstructorsTests):
+    pass
 
 
 class TestPaceArrayConstructor():

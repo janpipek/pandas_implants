@@ -82,17 +82,20 @@ class PaceArray(ExtensionArray):
     def nbytes(self):
         return self.data.nbytes
 
-    def __array__(self) -> np.ndarray:
-        return self.data
+    def isna(self):
+        return np.isnan(self.data)
+
+    def __array__(self, dtype=None) -> np.ndarray:
+        return self.data.astype(dtype)
 
     def __len__(self) -> int:
         return len(self.data)
 
     def __getitem__(self, item):
-        return self.data[item]
-
-    def __repr__(self):
-        return f"xxx"
+        if np.isscalar(item):
+            return self.data[item]
+        else:
+            return self.__class__(self.data[item])
 
     @classmethod
     def _from_sequence(cls, scalars, dtype=None, copy=False) -> "PaceArray":
