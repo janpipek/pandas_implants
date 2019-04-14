@@ -26,7 +26,10 @@ class Pace:
 
     @classmethod
     def format(cls, f: float) -> str:
-        return "X:XX"
+        if np.isnan(f):
+            return "NaN"
+        m, s = divmod(f, 60)
+        return f"{int(m)}:{'0' if s < 10 else ''}{s}"
 
     def __init__(self, value):
         if isinstance(value, str):
@@ -105,6 +108,10 @@ class PaceArray(ExtensionArray):
             return self.data[item]
         else:
             return self.__class__(self.data[item])
+
+
+    def _formatter(self, boxed=False):
+        return lambda x: Pace.format(x)
 
     @classmethod
     def _from_sequence(cls, scalars, dtype=None, copy=False) -> "PaceArray":
