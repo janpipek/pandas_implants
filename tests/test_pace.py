@@ -22,6 +22,10 @@ class TestPaceArrayConstructor():
         array = PaceArray(["4:00", "4:20"])
         assert np.allclose(array, [240, 260])
 
+    def test_with_invalid_strings(self):
+        array = PaceArray(["4:a00", "4:20x"])
+        assert np.allclose(array, [240, 260])
+
     def test_with_ints(self):
         array = PaceArray([240, 260])
         assert np.allclose(array, [240, 260])
@@ -31,6 +35,12 @@ class TestPaceArrayConstructor():
         assert np.allclose(array, [240.1, 260.5])
 
 
-def test_create_series_by_name():
-    series = pd.Series(["4:00", "4:20"], dtype="pace")
-    assert np.allclose(np.array(series), [240, 260])
+class TestSeriesConstructor():
+    def test_with_cls(self):
+        array = PaceArray(["4:00", "4:20"])
+        series = pd.Series(array)
+        assert np.allclose(np.array(series), [240, 260])
+
+    def test_with_name(self):
+        series = pd.Series(["4:00", "4:20"], dtype="pace")
+        assert np.allclose(np.array(series), [240, 260])

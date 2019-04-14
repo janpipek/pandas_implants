@@ -72,8 +72,13 @@ class PaceArray(ExtensionArray):
         self._dtype = dtype
         self.data = array
 
+    @property
     def dtype(self) -> ExtensionDtype:
         return self._dtype
+
+    @property
+    def nbytes(self):
+        return self.data.nbytes
 
     def __array__(self) -> np.ndarray:
         return self.data
@@ -83,6 +88,9 @@ class PaceArray(ExtensionArray):
 
     def __getitem__(self, item):
         return self.data[item]
+
+    def __repr__(self):
+        return f"xxx"
 
     @classmethod
     def _from_sequence(cls, scalars, dtype=None, copy=False) -> "PaceArray":
