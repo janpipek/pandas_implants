@@ -66,6 +66,8 @@ class PaceArray(ExtensionArray):
             array = array.astype(dtype.type)
         elif array.dtype.kind in ['U', 'S']:
             array = np.array([Pace.parse(val) for val in array], dtype=dtype.type)
+        elif array.dtype.kind == "m":
+            array = array / np.timedelta64(1, 's')
         else:
             raise ValueError(f"Cannot create PaceArray from values of type '{dtype}'.")
 
