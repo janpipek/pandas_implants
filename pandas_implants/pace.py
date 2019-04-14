@@ -78,6 +78,15 @@ class PaceArray(ExtensionArray):
     def dtype(self) -> ExtensionDtype:
         return self._dtype
 
+    def astype(self, dtype, copy=True):
+        typename = dtype if isinstance(dtype, str) else dtype.name
+        if self.dtype == dtype:
+            return self
+        elif typename == "timedelta64":
+            return np.asarray(self.data * 1e9, dtype="timedelta64[ns]").astype(dtype)
+        else:
+            return np.asarray(self).astype(dtype)
+
     @property
     def nbytes(self):
         return self.data.nbytes
