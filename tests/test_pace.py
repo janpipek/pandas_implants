@@ -1,10 +1,11 @@
+import operator
+
 import numpy as np
 import pandas as pd
 import pytest
-
-import pandas_implants.pace
-from pandas_implants.pace import PaceArray, PaceType
 from pandas.tests.extension import base
+
+from pandas_implants.pace import PaceArray, PaceDtype
 
 
 # Fixtures as defined in https://github.com/pandas-dev/pandas/blob/master/pandas/tests/extension/conftest.py
@@ -14,9 +15,25 @@ def data():
 
 
 @pytest.fixture
+def na_value():
+    """The scalar missing value for this type. Default 'None'"""
+    return np.nan
+
+
+@pytest.fixture
+def na_cmp():
+    """Binary operator for comparing NA values.
+    Should return a function of two arguments that returns
+    True if both arguments are (scalar) NA for your type.
+    By default, uses ``operator.is_``
+    """
+    return operator.is_
+
+
+@pytest.fixture
 def data_missing():
     """Length-2 array with [NA, Valid]"""
-    return PaceArray(["1:00", np.nan])
+    return PaceArray([np.nan, "1:00"])
 
 
 @pytest.fixture(params=['data', 'data_missing'])
@@ -30,17 +47,20 @@ def all_data(request, data, data_missing):
 
 @pytest.fixture
 def dtype():
-    return PaceType()
+    return PaceDtype()
 
 
 # https://pandas.pydata.org/pandas-docs/stable/development/extending.html#testing-extension-arrays
 class TestConstructors(base.BaseConstructorsTests): pass
 
 
-class TestCastingTests(base.BaseCastingTests): pass
+class TestCasting(base.BaseCastingTests): pass
 
 
-class TestDtypeTests(base.BaseDtypeTests): pass
+class TestDtype(base.BaseDtypeTests): pass
+
+
+class TestGetitem(base.BaseGetitemTests): pass
 
 
 class TestPaceArrayConstructor():
