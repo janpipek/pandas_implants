@@ -1,0 +1,3 @@
+- Universal type for numpy structures
+- Data class?
+- Units (from astropy?)
