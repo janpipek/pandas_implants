@@ -12,4 +12,14 @@ def data():
     return UnitsExtensionArray([1, 2] + 98 * [3], m)
 
 
+
+
+@pytest.fixture(params=["", "mm", "kg s"])
+def dtype(request):
+    return UnitsDtype(request.param)
+
 class TestConstructors(base.BaseConstructorsTests): pass
+
+class TestDtype(base.BaseDtypeTests): pass
+
+

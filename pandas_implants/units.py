@@ -32,7 +32,7 @@ class UnitsDtype(ExtensionDtype):
 
     @classmethod
     def construct_from_string(cls, string) -> "UnitsDtype":
-        match = re.match(f"{cls.BASE_NAME}\\[(?P<name>.+)\\]", string)
+        match = re.match(f"{cls.BASE_NAME}\\[(?P<name>.*)\\]$", string)
         if not match:
             raise TypeError(f"Invalid UnitsDtype string: {string}")
         return cls(match["name"])
@@ -46,7 +46,7 @@ class UnitsDtype(ExtensionDtype):
         return f"{self.BASE_NAME}[{self.unit.to_string()}]"
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(\"{self.unit.name}\")"
+        return f"{self.__class__.__name__}(\"{self.unit.to_string()}\")"
 
 
 class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
