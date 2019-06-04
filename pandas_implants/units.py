@@ -107,6 +107,23 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         else:
             return Quantity(obj)
 
+    def astype(self, dtype, copy=True):
+        def _as_units_dtype(unit):
+            quantity = self._to_quantity(self).to(unit)
+            return self.__class__(quantity)
+
+        if isinstance(dtype, UnitsDtype):
+            return _as_units_dtype(dtype.unit)
+        elif isinstance(dtype, str):
+            try:
+                dtype = UnitsDtype(dtype)
+                return _as_units_dtype(dtype.unit)
+            except:
+                pass
+        
+        # Fall-back to default variant
+        return ExtensionArray.astype(self, dtype, copy=copy)
+
     def _formatter(self, boxed=False):
         return lambda x: str(x)
 
