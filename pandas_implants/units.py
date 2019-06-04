@@ -6,16 +6,12 @@ from typing import Union
 import numpy as np
 from astropy.units import Quantity, Unit
 from numpy.core._multiarray_umath import ndarray
-from pandas.api.extensions import (
-    ExtensionDtype,
-    ExtensionArray,
-    ExtensionScalarOpsMixin,
-    register_extension_dtype,
-)
+from pandas.api.extensions import (ExtensionArray, ExtensionDtype,
+                                   ExtensionScalarOpsMixin,
+                                   register_extension_dtype)
 from pandas.compat import set_function_name
-from pandas.core.dtypes.inference import is_list_like
 from pandas.core import ops
-
+from pandas.core.dtypes.inference import is_list_like
 
 
 @register_extension_dtype
@@ -61,9 +57,18 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             self._dtype = UnitsDtype(array.unit)
             self.data = array.value.astype(float)
         else:
-            if not unit:
-                raise ValueError("You have to provide a unit!")
-            array = np.array(array, dtype=float) if copy else np.asarray(array, dtype=float)
+            q = Quantity(array)
+            if q.unit.is_unity():
+                if unit:
+                    q = q * unit
+            else:
+                if unit and q.unit != unit:
+                    raise ValueError("Dtypes are not equivalent")
+                    
+            self._dtype = UnitsDtype(q.unit)
+            self.data = q.value.astype(float)
+        if False:
+            array = Quantity(array, dtype=float) if copy else np.asarray(array, dtype=float)
             self.data = array.astype(float)
             self._dtype = UnitsDtype(unit)
 
@@ -77,6 +82,9 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     def __len__(self):
         return len(self.data)
+
+    def __array__(self, dtype=None):
+        return self.data.astype(dtype) if dtype else self.data
 
     @property
     def nbytes(self):
@@ -113,6 +121,8 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     @classmethod
     def _create_method(cls, op, coerce_to_dtype=True):
+        # Overloaded from the default variant
+        # to by-pass conversion to numpy arrays.
         def _binop(self, other):
             self_q = cls._to_quantity(self)
             other_q = cls._to_quantity(other)
@@ -124,6 +134,10 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
         op_name = ops._get_op_name(op, True)
         return set_function_name(_binop, op_name, cls)
+
+    def copy(self, deep=False):
+        return self.__class__(self.data, self.unit, copy=True)
+        
     
     # * _from_sequence
     #* _from_factorized
