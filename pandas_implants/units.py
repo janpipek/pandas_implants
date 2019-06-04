@@ -107,6 +107,9 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         else:
             return Quantity(obj)
 
+    def to_quantity(self) -> Quantity:
+        return self._to_quantity(self)
+
     def astype(self, dtype, copy=True):
         def _as_units_dtype(unit):
             quantity = self._to_quantity(self).to(unit)
@@ -125,13 +128,25 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         return ExtensionArray.astype(self, dtype, copy=copy)
 
     def _formatter(self, boxed=False):
-        return lambda x: str(x)
+        return lambda x: f"{x} {self.unit}"
 
     def __getitem__(self, item):
         if np.isscalar(item):
             return Quantity(self.data[item], unit=self.unit)
         else:
             return self.__class__(self.data[item], unit=self.unit)
+
+    @classmethod
+    def _concat_same_type(cls, to_concat):
+        # to_concat = list(to_concat)
+        if len(to_concat) == 0:
+            return cls([])
+        elif len(to_concat) == 1:
+            return to_concat[0]
+        elif len(set(item.unit for item in to_concat)) != 1:
+            raise ValueError("Not all concatenated arrays have the same units.")
+        else:
+            return cls(np.concatenate([item.data for item in to_concat]), to_concat[0].unit)
 
     def isna(self):
         return np.isnan(self.data)
@@ -154,18 +169,11 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     def copy(self, deep=False):
         return self.__class__(self.data, self.unit, copy=True)
-        
-    
-    # * _from_sequence
+
+    # TODO: Implement!
     #* _from_factorized
-    #* __getitem__
-    #* __len__
-    #* dtype
-    #* nbytes
-    #* isna
     #* take
-    #* copy
-    #* _concat_same_type
+
 
 
 UnitsExtensionArray._add_arithmetic_ops()
