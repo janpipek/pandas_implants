@@ -128,13 +128,16 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         return ExtensionArray.astype(self, dtype, copy=copy)
 
     def _formatter(self, boxed=False):
-        return lambda x: f"{x} {self.unit}"
-
+        return lambda x: (str(x) if isinstance(x, Quantity) else f"{x} {self.unit}")
+        
     def __getitem__(self, item):
         if np.isscalar(item):
             return Quantity(self.data[item], unit=self.unit)
         else:
             return self.__class__(self.data[item], unit=self.unit)
+
+    def take(self, indices, allow_fill=False, fill_value=None):
+        ...
 
     @classmethod
     def _concat_same_type(cls, to_concat):
