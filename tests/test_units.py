@@ -48,6 +48,17 @@ def dtype(request):
     return UnitsDtype(request.param)
 
 
+@pytest.fixture
+def na_cmp():
+    return np.isnan
+
+
+@pytest.fixture
+def na_value():
+    # Must be the same unit as others
+    return np.nan * m
+
+
 class TestConstructors(base.BaseConstructorsTests): pass
 
 

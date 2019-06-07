@@ -12,6 +12,7 @@ from pandas.api.extensions import (ExtensionArray, ExtensionDtype,
 from pandas.compat import set_function_name
 from pandas.core import ops
 from pandas.core.dtypes.inference import is_list_like
+from pandas.core.algorithms import take
 
 
 @register_extension_dtype
@@ -136,8 +137,11 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         else:
             return self.__class__(self.data[item], unit=self.unit)
 
-    def take(self, indices, allow_fill=False, fill_value=None):
-        ...
+    def take(self, indices, allow_fill=False, fill_value=None) -> "UnitsExtensionArray":
+        if allow_fill and fill_value is None:
+            fill_value = np.nan
+        values = take(self.data, indices, allow_fill=allow_fill, fill_value=fill_value)
+        return UnitsExtensionArray(values, self.unit)
 
     @classmethod
     def _concat_same_type(cls, to_concat):
@@ -175,7 +179,6 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     # TODO: Implement!
     #* _from_factorized
-    #* take
 
 
 
