@@ -260,7 +260,8 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         elif name in to_implement_yet:
             raise NotImplementedError
 
-    def _from_factorized(self):
+    @classmethod
+    def _from_factorized(cls, values, original):
         # TODO: Will we actually implement this?
         raise NotImplementedError
 
