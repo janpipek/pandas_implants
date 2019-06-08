@@ -3,7 +3,11 @@ import builtins
 from datetime import timedelta
 
 import numpy as np
-from pandas.api.extensions import ExtensionDtype, ExtensionArray, register_extension_dtype
+from pandas.api.extensions import (
+    ExtensionDtype,
+    ExtensionArray,
+    register_extension_dtype,
+)
 from pandas.core.algorithms import take
 
 
@@ -21,7 +25,11 @@ class Pace:
                 if len(frags) == 1:
                     interval = timedelta(seconds=float(frags[0]))
                 else:
-                    interval = timedelta(hours=frags[-3] if len(frags) == 3 else 0, minutes=frags[-2], seconds=frags[-1])
+                    interval = timedelta(
+                        hours=frags[-3] if len(frags) == 3 else 0,
+                        minutes=frags[-2],
+                        seconds=frags[-1],
+                    )
                 return interval.total_seconds()
             except ValueError:
                 raise ValueError("Cannot parse as time: {0}".format(s))
@@ -48,12 +56,11 @@ class PaceDtype(ExtensionDtype):
     na_value = np.nan
 
     @classmethod
-    def construct_from_string(cls, string: str) -> 'PaceDtype':
+    def construct_from_string(cls, string: str) -> "PaceDtype":
         if string == cls.name:
             return cls()
         else:
-            raise TypeError("Cannot construct a '{}' from "
-                            "'{}'".format(cls, string))
+            raise TypeError("Cannot construct a '{}' from " "'{}'".format(cls, string))
 
     @classmethod
     def construct_array_type(cls) -> builtins.type:
@@ -61,14 +68,16 @@ class PaceDtype(ExtensionDtype):
 
     def convert_array(self, array) -> np.ndarray:
         array = np.asarray(array)
-        if array.dtype.kind in ['f', 'i']:
+        if array.dtype.kind in ["f", "i"]:
             return array.astype(self.type)
-        elif array.dtype.kind in ['U', 'S']:
+        elif array.dtype.kind in ["U", "S"]:
             return np.array([Pace.parse(val) for val in array], dtype=self.type)
         elif array.dtype.kind == "m":
-            return array / np.timedelta64(1, 's')
+            return array / np.timedelta64(1, "s")
         else:
-            raise ValueError(f"Cannot create PaceDtype from values of type '{array.dtype}'.")
+            raise ValueError(
+                f"Cannot create PaceDtype from values of type '{array.dtype}'."
+            )
 
     def convert_scale(self, scalar) -> float:
         return Pace(scalar).value
@@ -91,12 +100,18 @@ class PaceArray(ExtensionArray):
         return self._dtype
 
     def astype(self, dtype, copy=True) -> np.ndarray:
-        typename = dtype if isinstance(dtype, str) else getattr(dtype, "name", dtype.__class__.__name__)
+        typename = (
+            dtype
+            if isinstance(dtype, str)
+            else getattr(dtype, "name", dtype.__class__.__name__)
+        )
         if self.dtype == dtype:
             # TODO: This looks strange
             return self.copy() if copy else self
         elif typename.startswith("timedelta64"):
-            return np.asarray(self.data * 1e9, dtype="timedelta64[ns]").astype(dtype, copy=copy)
+            return np.asarray(self.data * 1e9, dtype="timedelta64[ns]").astype(
+                dtype, copy=copy
+            )
         else:
             return np.asarray(self).astype(dtype, copy=copy)
 
@@ -131,8 +146,7 @@ class PaceArray(ExtensionArray):
         if allow_fill and fill_value is None:
             fill_value = self.dtype.na_value
 
-        result = take(self.data, indices, fill_value=fill_value,
-                      allow_fill=allow_fill)
+        result = take(self.data, indices, fill_value=fill_value, allow_fill=allow_fill)
         return self._from_sequence(result, dtype=self.dtype)
 
     def copy(self, deep=False) -> "PaceArray":
@@ -145,5 +159,3 @@ class PaceArray(ExtensionArray):
     def _from_sequence(cls, scalars, dtype=None, copy=False) -> "PaceArray":
         result = cls(scalars)
         return result
-
-
