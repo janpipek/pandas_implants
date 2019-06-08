@@ -1,4 +1,9 @@
-import pandas as pd
+__version__ = "0.0.1"
 
-
-__version__ = '0.0.1'
+from .units import (
+    UnitsDtype,
+    UnitsExtensionArray,
+    UnitsSeriesAccessor,
+    UnitsDataFrameAccessor,
+    Unit,
+)

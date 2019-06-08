@@ -4,17 +4,27 @@ import re
 from typing import Union
 
 import numpy as np
+import pandas as pd
+from astropy import units as u
 from astropy.units import Quantity, Unit
-from pandas.api.extensions import (ExtensionArray,
-                                   ExtensionDtype,
-                                   ExtensionScalarOpsMixin,
-                                   register_extension_dtype)
+from astropy.units import imperial
+from astropy.units.format.generic import Generic
+from pandas.api.extensions import (
+    ExtensionArray,
+    ExtensionDtype,
+    ExtensionScalarOpsMixin,
+    register_extension_dtype,
+    register_series_accessor,
+    register_dataframe_accessor,
+)
 from pandas.api.types import is_list_like, is_array_like, is_scalar
 from pandas.compat import set_function_name
+from pandas.core import nanops
 from pandas.core import ops
 from pandas.core.algorithms import take
 from pandas.core.dtypes.generic import ABCIndexClass, ABCSeries
-from pandas.core import nanops
+
+imperial.enable()
 
 
 @register_extension_dtype
@@ -49,11 +59,13 @@ class UnitsDtype(ExtensionDtype):
         return f"{self.BASE_NAME}[{self.unit.to_string()}]"
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(\"{self.unit.to_string()}\")"
+        return f'{self.__class__.__name__}("{self.unit.to_string()}")'
 
 
 class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
-    def __init__(self, array, unit: Union[None, str, Unit] = None, *, copy: bool = True):
+    def __init__(
+        self, array, unit: Union[None, str, Unit] = None, *, copy: bool = True
+    ):
         if isinstance(array, Quantity):
             if copy:
                 array = array.copy()
@@ -67,7 +79,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             else:
                 if unit and q.unit != unit:
                     raise ValueError("Dtypes are not equivalent")
-                    
+
             self._dtype = UnitsDtype(q.unit)
             self.data = q.value.astype(float)
 
@@ -111,10 +123,22 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
     def to_quantity(self) -> Quantity:
         return self._to_quantity(self)
 
+    def to(
+        self, new_unit: Union[str, Unit], equivalencies=None
+    ) -> "UnitsExtensionArray":
+        q = self.to_quantity()
+        try:
+            new_data = q.to(new_unit, equivalencies or [])
+        except u.UnitConversionError:
+            if q.unit.physical_type == "temperature":
+                new_data = q.to(new_unit, u.temperature())
+            else:
+                raise
+        return UnitsExtensionArray(new_data)
+
     def astype(self, dtype, copy=True):
         def _as_units_dtype(unit):
-            quantity = self._to_quantity(self).to(unit)
-            return self.__class__(quantity)
+            return self.to(unit)
 
         if isinstance(dtype, UnitsDtype):
             return _as_units_dtype(dtype.unit)
@@ -124,13 +148,13 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
                 return _as_units_dtype(dtype.unit)
             except:
                 pass
-        
+
         # Fall-back to default variant
         return ExtensionArray.astype(self, dtype, copy=copy)
 
     def _formatter(self, boxed=False):
         return lambda x: (str(x) if isinstance(x, Quantity) else f"{x} {self.unit}")
-        
+
     def __getitem__(self, item):
         if np.isscalar(item):
             return Quantity(self.data[item], unit=self.unit)
@@ -156,7 +180,9 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         elif len(set(item.unit for item in to_concat)) != 1:
             raise ValueError("Not all concatenated arrays have the same units.")
         else:
-            return cls(np.concatenate([item.data for item in to_concat]), to_concat[0].unit)
+            return cls(
+                np.concatenate([item.data for item in to_concat]), to_concat[0].unit
+            )
 
     def isna(self):
         return np.isnan(self.data)
@@ -171,14 +197,21 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
                 return NotImplemented
 
             elif is_scalar(other):
-                if op_name in ['__eq__', '__ne__', '__lt__', '__gt__', '__le__', '__ge__']:
+                if op_name in [
+                    "__eq__",
+                    "__ne__",
+                    "__lt__",
+                    "__gt__",
+                    "__le__",
+                    "__ge__",
+                ]:
                     return NotImplemented
 
             elif is_array_like(other):
                 if self.dtype != other.dtype:
-                    if op_name in ['__eq__', '__ne__']:
+                    if op_name in ["__eq__", "__ne__"]:
                         return NotImplemented
-                    elif op_name in ['__lt__', '__gt__', '__le__', '__ge__']:
+                    elif op_name in ["__lt__", "__gt__", "__le__", "__ge__"]:
                         raise TypeError
 
             self_q = cls._to_quantity(self)
@@ -227,8 +260,50 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         elif name in to_implement_yet:
             raise NotImplementedError
 
-    # TODO: Implement!
-    #* _from_factorized
+    def _from_factorized(self):
+        # TODO: Will we actually implement this?
+        raise NotImplementedError
+
+
+@register_series_accessor("units")
+class UnitsSeriesAccessor:
+    def __init__(self, obj):
+        # Inspired by fletcher
+        if not isinstance(obj.values, UnitsExtensionArray):
+            raise AttributeError("Only UnitsExtensionArray has units accessor")
+        self.obj = obj
+
+    @property
+    def unit(self):
+        return self.obj.values.unit
+
+    def to(self, unit, equivalencies=None):
+        """Convert series to another unit."""
+        new_array = self.obj.values.to(unit, equivalencies)
+        return self.obj.__class__(new_array)
+
+    def to_si(self):
+        """Convert series to another unit."""
+        unit = self.obj.values.unit
+        formatter = Generic()
+        formatter._show_scale = False
+        new_unit = Unit(formatter.to_string(unit.si))
+        return self.to(new_unit)
+
+
+@register_dataframe_accessor("units")
+class UnitsDataFrameAccessor:
+    def __init__(self, obj: pd.DataFrame):
+        self.obj = obj
+
+    def to_si(self):
+        def _f(col):
+            try:
+                return col.units.to_si()
+            except AttributeError:
+                return col
+
+        return self.obj.apply(_f)
 
 
 UnitsExtensionArray._add_arithmetic_ops()
