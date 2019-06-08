@@ -50,7 +50,13 @@ def dtype(request):
 
 @pytest.fixture
 def na_cmp():
-    return np.isnan
+    # Note: np.nan != np.nan
+    def cmp(x, y):
+        if np.isnan(x.value):
+            return np.isnan(y.value)
+        else:
+            return x == y
+    return cmp
 
 
 @pytest.fixture
