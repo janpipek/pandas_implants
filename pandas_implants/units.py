@@ -5,14 +5,15 @@ from typing import Union
 
 import numpy as np
 from astropy.units import Quantity, Unit
-from numpy.core._multiarray_umath import ndarray
-from pandas.api.extensions import (ExtensionArray, ExtensionDtype,
+from pandas.api.extensions import (ExtensionArray,
+                                   ExtensionDtype,
                                    ExtensionScalarOpsMixin,
                                    register_extension_dtype)
+from pandas.api.types import is_list_like, is_array_like, is_scalar
 from pandas.compat import set_function_name
 from pandas.core import ops
-from pandas.core.dtypes.inference import is_list_like
 from pandas.core.algorithms import take
+from pandas.core.dtypes.generic import ABCIndexClass, ABCSeries
 from pandas.core import nanops
 
 
@@ -24,13 +25,13 @@ class UnitsDtype(ExtensionDtype):
     kind = "f"
 
     _is_numeric = True
+    _metadata = ("unit",)
 
     def __init__(self, unit):
         if isinstance(unit, Unit):
             self.unit = unit
         else:
             self.unit = Unit(unit)
-
 
     @classmethod
     def construct_from_string(cls, string) -> "UnitsDtype":
@@ -69,10 +70,6 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
                     
             self._dtype = UnitsDtype(q.unit)
             self.data = q.value.astype(float)
-        if False:
-            array = Quantity(array, dtype=float) if copy else np.asarray(array, dtype=float)
-            self.data = array.astype(float)
-            self._dtype = UnitsDtype(unit)
 
     @property
     def dtype(self) -> UnitsDtype:
@@ -106,6 +103,8 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             return obj
         elif isinstance(obj, cls):
             return Quantity(obj.data, obj.unit)
+        elif is_list_like(obj):
+            return Quantity(list(obj))
         else:
             return Quantity(obj)
 
@@ -167,6 +166,21 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         # Overloaded from the default variant
         # to by-pass conversion to numpy arrays.
         def _binop(self, other):
+            if isinstance(other, (ABCSeries, ABCIndexClass)):
+                # rely on pandas to unbox and dispatch to us
+                return NotImplemented
+
+            elif is_scalar(other):
+                if op_name in ['__eq__', '__ne__', '__lt__', '__gt__', '__le__', '__ge__']:
+                    return NotImplemented
+
+            elif is_array_like(other):
+                if self.dtype != other.dtype:
+                    if op_name in ['__eq__', '__ne__']:
+                        return NotImplemented
+                    elif op_name in ['__lt__', '__gt__', '__le__', '__ge__']:
+                        raise TypeError
+
             self_q = cls._to_quantity(self)
             other_q = cls._to_quantity(other)
             result_q = op(self_q, other_q)
@@ -182,12 +196,13 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         return self.__class__(self.data, self.unit, copy=True)
 
     def _reduce(self, name, skipna=True, **kwargs):
-        # any, all, min, max, sum, mean, median, prod, std, var, sem, kurt, skew
         # Borrowed from IntegerArray
 
         to_proxy = ["min", "max", "sum", "mean", "std", "var"]
         to_nanops = ["median", "sem"]
         to_error = ["any", "all", "prod"]
+
+        # TODO: Check the dimension of this
         to_implement_yet = ["kurt", "skew"]
 
         if name in to_proxy:
@@ -216,6 +231,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
     #* _from_factorized
 
 
-
 UnitsExtensionArray._add_arithmetic_ops()
 UnitsExtensionArray._add_comparison_ops()
+
+UnitsExtensionArray.__pow__ = UnitsExtensionArray._create_method(operator.pow)
