@@ -4,8 +4,9 @@ import numpy as np
 import pandas as pd
 from astropy.units import Quantity, Unit, m
 from pandas.tests.extension import base
+from pandas.tests.extension.base import BaseOpsUtil
 
-from pandas_implants.units import UnitsDtype, UnitsExtensionArray
+from pandas_implants.units import UnitsDtype, UnitsExtensionArray, UnitsSeriesAccessor
 
 try:
     from pandas.conftest import (
@@ -180,3 +181,51 @@ class TestRepr:
 
     def test_series_repr(self, simple_data):
         assert "0   1.0 m\n1   2.0 m\n2   3.0 m\ndtype: unit[m]" == repr(pd.Series(simple_data))
+
+
+class TestUnitsSeriesAccessor(BaseOpsUtil):
+    def test_init(self, simple_data):
+        s = pd.Series(simple_data)
+        assert isinstance(s.units, UnitsSeriesAccessor)
+
+    def test_invalid_type(self):
+        s = pd.Series([1, 2, 3])
+        with pytest.raises(AttributeError):
+            _ = s.units
+
+    def test_to(self, simple_data):
+        s = pd.Series(simple_data)
+        result = s.units.to("mm")
+        expected = pd.Series([1000, 2000, 3000], dtype="unit[mm]")
+        self.assert_series_equal(result, expected)
+
+    def test_unit(self, simple_data):
+        s = pd.Series(simple_data)
+        assert s.units.unit == Unit("m")
+
+    def test_to_si(self):
+        s = pd.Series([1, 2, 3], dtype="unit[km]")
+        result = s.units.to_si()
+        expected = pd.Series([1000, 2000, 3000], dtype="unit[m]")
+        self.assert_series_equal(result, expected)
+
+    def test_temperature(self):
+        s = pd.Series([0, 100], dtype="unit[deg_C]")
+
+        s_f = s.units.to("deg_F")
+        s_f_expected = pd.Series([32, 212], dtype="unit[deg_F]")
+        self.assert_series_equal(s_f, s_f_expected)
+
+
+class TestUnitsDataFrameAccessor(BaseOpsUtil):
+    def test_df_to_si(self):
+        df = pd.DataFrame({
+            "a": pd.Series([1, 2, 3], dtype="unit[km]"),
+            "b": pd.Series([2, 3, 4], dtype="unit[hour]")
+        })
+        result = df.units.to_si()
+        expected = pd.DataFrame({
+            "a": pd.Series([1000, 2000, 3000], dtype="unit[m]"),
+            "b": pd.Series([7200, 10800, 14400], dtype="unit[s]")
+        })
+        self.assert_frame_equal(result, expected)
