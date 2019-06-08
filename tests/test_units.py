@@ -74,8 +74,13 @@ class TestCasting(base.BaseCastingTests): pass
 class TestDtype(base.BaseDtypeTests): pass
 
 
-class TestGetitem(base.BaseGetitemTests): pass
-    
+class TestGetitem(base.BaseGetitemTests):
+    def test_unitless(self):
+        series = pd.Series([0, 1, 2], dtype="unit[]")
+        new_index = [2, 4]
+        result = series.reindex(new_index)
+        expected = pd.Series([2, np.nan], dtype="unit[]", index=new_index)
+        self.assert_series_equal(result, expected)
 
 class TestRepr:
     def test_repr(self, simple_data):

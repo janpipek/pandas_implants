@@ -138,8 +138,11 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             return self.__class__(self.data[item], unit=self.unit)
 
     def take(self, indices, allow_fill=False, fill_value=None) -> "UnitsExtensionArray":
-        if allow_fill and fill_value is None:
-            fill_value = np.nan
+        if allow_fill:
+            if fill_value is None or np.isnan(fill_value):
+                fill_value = np.nan
+            else:
+                fill_value = fill_value.value
         values = take(self.data, indices, allow_fill=allow_fill, fill_value=fill_value)
         return UnitsExtensionArray(values, self.unit)
 
