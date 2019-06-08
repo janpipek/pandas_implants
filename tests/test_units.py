@@ -7,6 +7,29 @@ from pandas.tests.extension import base
 
 from pandas_implants.units import UnitsDtype, UnitsExtensionArray
 
+try:
+    from pandas.conftest import (
+        all_arithmetic_operators,
+        all_compare_operators,
+    )
+except:
+    _all_arithmetic_operators = ['__add__', '__radd__',
+        '__sub__', '__rsub__',
+        '__mul__', '__rmul__',
+        '__floordiv__', '__rfloordiv__',
+        '__truediv__', '__rtruediv__',
+        '__pow__', '__rpow__',
+        '__mod__', '__rmod__']
+
+    @pytest.fixture(params=_all_arithmetic_operators)
+    def all_arithmetic_operators(request):
+        return request.param
+
+    @pytest.fixture(params=['__eq__', '__ne__', '__le__',
+                        '__lt__', '__ge__', '__gt__'])
+    def all_compare_operators(request):
+        return request.param
+
 
 @pytest.fixture
 def data():
@@ -81,6 +104,19 @@ class TestGetitem(base.BaseGetitemTests):
         result = series.reindex(new_index)
         expected = pd.Series([2, np.nan], dtype="unit[]", index=new_index)
         self.assert_series_equal(result, expected)
+
+
+class TestPrinting(base.BasePrintingTests):
+    pass
+
+
+class TestArithmeticsOps(base.BaseArithmeticOpsTests):
+    pass
+
+
+class TestComparisonOps(base.BaseComparisonOpsTests):
+    pass
+
 
 class TestRepr:
     def test_repr(self, simple_data):
