@@ -262,8 +262,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     @classmethod
     def _from_factorized(cls, values, original):
-        # TODO: Will we actually implement this?
-        raise NotImplementedError
+        return UnitsExtensionArray(values, original.dtype.unit)
 
 
 @register_series_accessor("units")

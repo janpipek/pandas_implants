@@ -2,7 +2,7 @@ import pytest
 
 import numpy as np
 import pandas as pd
-from astropy.units import Quantity, Unit, m
+from astropy.units import Quantity, Unit, m, UnitConversionError
 from pandas.tests.extension import base
 from pandas.tests.extension.base import BaseOpsUtil
 
@@ -90,13 +90,25 @@ def na_value():
     return np.nan * m
 
 
+@pytest.fixture
+def data_for_grouping():
+    return UnitsExtensionArray([2, 2, np.nan, np.nan, 1, 1, 2, 3], "g")
+
+
 class TestConstructors(base.BaseConstructorsTests): pass
 
 
-class TestCasting(base.BaseCastingTests): pass
+class TestCasting(base.BaseCastingTests):
+    def test_compatible_conversion(self):
+        s = pd.Series([3, 4], dtype="unit[m]")
+        result = s.astype("unit[cm]")
+        expected = pd.Series([300, 400], dtype="unit[cm]")
 
 
 class TestDtype(base.BaseDtypeTests): pass
+
+
+class TestGroupBy(base.BaseGroupbyTests): pass
 
 
 class TestGetitem(base.BaseGetitemTests):
@@ -126,6 +138,20 @@ class TestArithmeticsOps(base.BaseArithmeticOpsTests):
 
     def test_error(self, data, all_arithmetic_operators):
         pass
+
+    def test_add_incompatible_units(self):
+        s1 = pd.Series([1, 2, 3, 4], dtype="unit[kg]")
+        s2 = pd.Series([3, 4, 3, 4], dtype="unit[m]")
+        with pytest.raises(UnitConversionError):
+            s1 + s2
+
+    def test_add_compatible_units(self):
+        s1 = pd.Series([1, 2, 3, 4], dtype="unit[m]")
+        s2 = pd.Series([3, 4, 3, 4], dtype="unit[km]")
+
+        expected = pd.Series([3001, 4002, 3003, 4004], dtype="unit[m]")
+        result = s1 + s2
+        self.assert_series_equal(expected, result)
 
     @pytest.mark.skip("Not implemented yet")
     def test_divmod(self, data):
