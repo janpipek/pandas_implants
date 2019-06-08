@@ -95,6 +95,26 @@ def data_for_grouping():
     return UnitsExtensionArray([2, 2, np.nan, np.nan, 1, 1, 2, 3], "g")
 
 
+@pytest.fixture
+def data_for_sorting():
+    """Length-3 array with a known sort order.
+
+    This should be three items [B, C, A] with
+    A < B < C
+    """
+    return UnitsExtensionArray([2, 3, 1], "m")
+
+
+@pytest.fixture
+def data_missing_for_sorting():
+    """Length-3 array with a known sort order.
+
+    This should be three items [B, NA, A] with
+    A < B and NA missing.
+    """
+    return UnitsExtensionArray([3, np.nan, 1], "m")
+
+
 class TestConstructors(base.BaseConstructorsTests): pass
 
 
@@ -118,6 +138,42 @@ class TestGetitem(base.BaseGetitemTests):
         result = series.reindex(new_index)
         expected = pd.Series([2, np.nan], dtype="unit[]", index=new_index)
         self.assert_series_equal(result, expected)
+
+
+class TestInterface(base.BaseInterfaceTests):
+    pass
+
+
+class TestMethods(base.BaseMethodsTests):
+    pass
+
+
+class TestBooleanReduce(base.BaseBooleanReduceTests):
+    pass
+
+
+class TestReshaping(base.BaseReshapingTests):
+    pass
+
+
+class TestNoReduce(base.BaseNoReduceTests):
+    pass
+
+
+class TestNumericReduce(base.BaseNumericReduceTests):
+    pass
+
+
+class TestSetitem(base.BaseSetitemTests):
+    pass
+
+
+class TestParsing(base.BaseParsingTests):
+    pass
+
+
+class TestMissing(base.BaseMissingTests):
+    pass
 
 
 class TestPrinting(base.BasePrintingTests):
