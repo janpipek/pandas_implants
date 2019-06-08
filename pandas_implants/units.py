@@ -13,6 +13,7 @@ from pandas.compat import set_function_name
 from pandas.core import ops
 from pandas.core.dtypes.inference import is_list_like
 from pandas.core.algorithms import take
+from pandas.core import nanops
 
 
 @register_extension_dtype
@@ -179,6 +180,37 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     def copy(self, deep=False):
         return self.__class__(self.data, self.unit, copy=True)
+
+    def _reduce(self, name, skipna=True, **kwargs):
+        # any, all, min, max, sum, mean, median, prod, std, var, sem, kurt, skew
+        # Borrowed from IntegerArray
+
+        to_proxy = ["min", "max", "sum", "mean", "std", "var"]
+        to_nanops = ["median", "sem"]
+        to_error = ["any", "all", "prod"]
+        to_implement_yet = ["kurt", "skew"]
+
+        if name in to_proxy:
+            q = self.to_quantity()
+            if name in ["std", "var"]:
+                kwargs = {"ddof": kwargs.pop("ddof", 1)}
+            else:
+                kwargs = {}
+            if skipna:
+                q = q[~np.isnan(q)]
+            return getattr(q, name)(**kwargs)
+
+        elif name in to_nanops:
+            data = self.data
+            method = getattr(nanops, "nan" + name)
+            result_without_dim = method(data, skipna=skipna)
+            return Quantity(result_without_dim, self.unit)
+
+        elif name in to_error:
+            raise TypeError(f"Cannot perform {name} with type {self.dtype}")
+
+        elif name in to_implement_yet:
+            raise NotImplementedError
 
     # TODO: Implement!
     #* _from_factorized

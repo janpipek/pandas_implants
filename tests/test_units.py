@@ -118,6 +118,38 @@ class TestComparisonOps(base.BaseComparisonOpsTests):
     pass
 
 
+class TestReduce:
+    def test_sum(self, data, data_missing):
+        assert pd.Series(data).sum() == 297 * m
+        assert np.isnan(pd.Series(data_missing).sum(skipna=False))
+        assert pd.Series(data_missing).sum() == 1 * m
+
+    def test_mean(self, data):
+        assert np.allclose(pd.Series(data).mean() / m, 2.97)
+
+    def test_min(self, data):
+        assert pd.Series(data).min() == 1 * m
+
+    def test_max(self, data):
+        assert pd.Series(data).max() == 3 * m
+
+    def test_median(self, data):
+        assert pd.Series(data).median() == 3 * m
+
+    def test_std(self, data):
+        assert np.allclose(pd.Series(data).std() / m, 0.2227015)
+
+    def test_sem(self, data):
+        assert np.allclose(pd.Series(data).sem() / m, 0.02227015033536137)
+
+    def test_var(self, data):
+        assert np.allclose(pd.Series(data).var() / (m **2),  0.0495959595959596)
+
+    def test_unsupported(self, data):
+        for method in ["any", "all", "prod"]:
+            with pytest.raises(TypeError):
+                getattr(pd.Series(data), method)()
+
 class TestRepr:
     def test_repr(self, simple_data):
         assert "<UnitsExtensionArray>\n[1.0 m, 2.0 m, 3.0 m]\nLength: 3, dtype: unit[m]" == repr(simple_data)
