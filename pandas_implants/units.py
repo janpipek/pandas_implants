@@ -141,6 +141,12 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             result = cls(scalars, copy=copy)
         return result
 
+    @classmethod
+    def _from_sequence_of_strings(cls, strings, dtype=None, copy=False):
+        values = [Quantity(s) for s in strings]
+        unit = dtype.unit if dtype else None
+        return UnitsExtensionArray(values, unit)
+
     def to_quantity(self) -> Quantity:
         return as_quantity(self)
 
