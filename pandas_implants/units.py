@@ -82,6 +82,8 @@ def as_quantity(obj) -> Quantity:
     elif isinstance(obj, UnitsExtensionArray):
         return Quantity(obj.value, obj.unit)
     elif is_list_like(obj):
+        if len(obj) == 0:
+            return Quantity([], "")
         return Quantity(list(obj))
     else:
         return Quantity(obj)
@@ -97,7 +99,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             self._dtype = UnitsDtype(array.unit)
             self._value = array.value.astype(float)
         else:
-            q = Quantity(array)
+            q = as_quantity(array)
             if q.unit.is_unity():
                 if unit:
                     q = q * unit
@@ -155,6 +157,8 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
         if isinstance(dtype, UnitsDtype):
             return _as_units_dtype(dtype.unit)
+        elif dtype in ["O", "object", object]:
+            return np.array([x * self.unit for x in self.value], dtype=object)
         elif isinstance(dtype, str):
             try:
                 dtype = UnitsDtype(dtype)
@@ -177,6 +181,8 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
     def __setitem__(self, key, value):
         if is_scalar(value) and np.isnan(value):
             q = Quantity(value, self.unit)
+        elif is_list_like(value) and len(value) == 0:
+            return
         else:
             q = as_quantity(value)
         q = convert(q, self.unit)
