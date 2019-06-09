@@ -62,6 +62,31 @@ class UnitsDtype(ExtensionDtype):
         return f'{self.__class__.__name__}("{self.unit.to_string()}")'
 
 
+def convert(q: Quantity, new_unit: Union[str, Unit], equivalencies=None) -> Quantity:
+    """Convert quantity to a new unit.
+
+    Customized to be a bit more universal than the original quantities.
+    """
+    try:
+        return q.to(new_unit, equivalencies or [])
+    except u.UnitConversionError:
+        if q.unit.physical_type == "temperature":
+            return q.to(new_unit, u.temperature())
+        else:
+            raise
+
+
+def as_quantity(obj) -> Quantity:
+    if isinstance(obj, Quantity):
+        return obj
+    elif isinstance(obj, UnitsExtensionArray):
+        return Quantity(obj.value, obj.unit)
+    elif is_list_like(obj):
+        return Quantity(list(obj))
+    else:
+        return Quantity(obj)
+
+
 class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
     def __init__(
         self, array, unit: Union[None, str, Unit] = None, *, copy: bool = True
@@ -70,7 +95,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             if copy:
                 array = array.copy()
             self._dtype = UnitsDtype(array.unit)
-            self.data = array.value.astype(float)
+            self._value = array.value.astype(float)
         else:
             q = Quantity(array)
             if q.unit.is_unity():
@@ -81,7 +106,12 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
                     raise ValueError("Dtypes are not equivalent")
 
             self._dtype = UnitsDtype(q.unit)
-            self.data = q.value.astype(float)
+            self._value = q.value.astype(float)
+
+    @property
+    def value(self) -> np.ndarray:
+        # Unfortunately, "values" attribute name is prohibited
+        return self._value
 
     @property
     def dtype(self) -> UnitsDtype:
@@ -91,15 +121,15 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
     def unit(self) -> Unit:
         return self.dtype.unit
 
-    def __len__(self):
-        return len(self.data)
+    def __len__(self) -> int:
+        return len(self.value)
 
-    def __array__(self, dtype=None):
-        return self.data.astype(dtype) if dtype else self.data
+    def __array__(self, dtype=None) -> np.ndarray:
+        return self.value.astype(dtype) if dtype else self.value
 
     @property
-    def nbytes(self):
-        return self.data.nbytes
+    def nbytes(self) -> int:
+        return self.value.nbytes
 
     @classmethod
     def _from_sequence(cls, scalars, dtype=None, copy=False) -> "UnitsExtensionArray":
@@ -109,31 +139,14 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             result = cls(scalars, copy=copy)
         return result
 
-    @classmethod
-    def _to_quantity(cls, obj) -> Quantity:
-        if isinstance(obj, Quantity):
-            return obj
-        elif isinstance(obj, cls):
-            return Quantity(obj.data, obj.unit)
-        elif is_list_like(obj):
-            return Quantity(list(obj))
-        else:
-            return Quantity(obj)
-
     def to_quantity(self) -> Quantity:
-        return self._to_quantity(self)
+        return as_quantity(self)
 
     def to(
         self, new_unit: Union[str, Unit], equivalencies=None
     ) -> "UnitsExtensionArray":
         q = self.to_quantity()
-        try:
-            new_data = q.to(new_unit, equivalencies or [])
-        except u.UnitConversionError:
-            if q.unit.physical_type == "temperature":
-                new_data = q.to(new_unit, u.temperature())
-            else:
-                raise
+        new_data = convert(q, new_unit, equivalencies)
         return UnitsExtensionArray(new_data)
 
     def astype(self, dtype, copy=True):
@@ -157,9 +170,14 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     def __getitem__(self, item):
         if np.isscalar(item):
-            return Quantity(self.data[item], unit=self.unit)
+            return Quantity(self.value[item], unit=self.unit)
         else:
-            return self.__class__(self.data[item], unit=self.unit)
+            return self.__class__(self.value[item], unit=self.unit)
+
+    def __setitem__(self, key, value):
+        q = self._to_quantity(value)
+
+
 
     def take(self, indices, allow_fill=False, fill_value=None) -> "UnitsExtensionArray":
         if allow_fill:
@@ -167,7 +185,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
                 fill_value = np.nan
             else:
                 fill_value = fill_value.value
-        values = take(self.data, indices, allow_fill=allow_fill, fill_value=fill_value)
+        values = take(self.value, indices, allow_fill=allow_fill, fill_value=fill_value)
         return UnitsExtensionArray(values, self.unit)
 
     @classmethod
@@ -181,11 +199,11 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             raise ValueError("Not all concatenated arrays have the same units.")
         else:
             return cls(
-                np.concatenate([item.data for item in to_concat]), to_concat[0].unit
+                np.concatenate([item.value for item in to_concat]), to_concat[0].unit
             )
 
     def isna(self):
-        return np.isnan(self.data)
+        return np.isnan(self.value)
 
     @classmethod
     def _create_method(cls, op, coerce_to_dtype=True):
@@ -226,7 +244,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         return set_function_name(_binop, op_name, cls)
 
     def copy(self, deep=False):
-        return self.__class__(self.data, self.unit, copy=True)
+        return self.__class__(self.value, self.unit, copy=True)
 
     def _reduce(self, name, skipna=True, **kwargs):
         # Borrowed from IntegerArray
@@ -249,7 +267,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             return getattr(q, name)(**kwargs)
 
         elif name in to_nanops:
-            data = self.data
+            data = self.value
             method = getattr(nanops, "nan" + name)
             result_without_dim = method(data, skipna=skipna)
             return Quantity(result_without_dim, self.unit)
@@ -264,27 +282,31 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
     def _from_factorized(cls, values, original):
         return UnitsExtensionArray(values, original.dtype.unit)
 
+    # value_counts(normalize=False, sort=True, ascending=False, bins=None, dropna=True)
+    def value_counts(self, dropna=True):
+        pass
+
 
 @register_series_accessor("units")
 class UnitsSeriesAccessor:
     def __init__(self, obj):
         # Inspired by fletcher
-        if not isinstance(obj.values, UnitsExtensionArray):
+        if not isinstance(obj.value, UnitsExtensionArray):
             raise AttributeError("Only UnitsExtensionArray has units accessor")
         self.obj = obj
 
     @property
     def unit(self):
-        return self.obj.values.unit
+        return self.obj.value.unit
 
     def to(self, unit, equivalencies=None):
         """Convert series to another unit."""
-        new_array = self.obj.values.to(unit, equivalencies)
+        new_array = self.obj.value.to(unit, equivalencies)
         return self.obj.__class__(new_array)
 
     def to_si(self):
         """Convert series to another unit."""
-        unit = self.obj.values.unit
+        unit = self.obj.value.unit
         formatter = Generic()
         formatter._show_scale = False
         new_unit = Unit(formatter.to_string(unit.si))

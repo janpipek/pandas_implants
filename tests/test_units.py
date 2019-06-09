@@ -2,6 +2,7 @@ import pytest
 
 import numpy as np
 import pandas as pd
+import pandas.util.testing as tm
 from astropy.units import Quantity, Unit, m, UnitConversionError
 from pandas.tests.extension import base
 from pandas.tests.extension.base import BaseOpsUtil
@@ -141,7 +142,14 @@ class TestGetitem(base.BaseGetitemTests):
 
 
 class TestInterface(base.BaseInterfaceTests):
-    pass
+    def test_array_interface(self, data):
+        # There is no such thing as array of Quantities
+        result = np.array(data)
+        assert result[0] == data.value[0]
+
+        result = np.array(data.value, dtype=object)
+        expected = np.array(list(data.value), dtype=object)
+        tm.assert_numpy_array_equal(result, expected)
 
 
 class TestMethods(base.BaseMethodsTests):
@@ -220,7 +228,7 @@ class TestComparisonOps(base.BaseComparisonOpsTests):
         s = pd.Series(data)
 
         result_2m = getattr(s, op_name)(2 * m)
-        expected_2m = getattr(data.data, op_name)(2)
+        expected_2m = getattr(data.value, op_name)(2)
         self.assert_series_equal(result_2m, expected_2m)
 
 
