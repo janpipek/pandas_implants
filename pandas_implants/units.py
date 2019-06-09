@@ -37,14 +37,16 @@ class UnitsDtype(ExtensionDtype):
     _is_numeric = True
     _metadata = ("unit",)
 
-    def __init__(self, unit):
-        if isinstance(unit, Unit):
+    def __init__(self, unit=None):
+        if isinstance(unit, (Unit, type(None))):
             self.unit = unit
         else:
             self.unit = Unit(unit)
 
     @classmethod
     def construct_from_string(cls, string) -> "UnitsDtype":
+        if string == cls.BASE_NAME:
+            return cls()
         match = re.match(f"{cls.BASE_NAME}\\[(?P<name>.*)\\]$", string)
         if not match:
             raise TypeError(f"Invalid UnitsDtype string: {string}")
@@ -82,11 +84,12 @@ def as_quantity(obj) -> Quantity:
     elif isinstance(obj, UnitsExtensionArray):
         return Quantity(obj.value, obj.unit)
     elif is_list_like(obj):
+        obj = list(obj)
         if len(obj) == 0:
             return Quantity([], "")
-        return Quantity(list(obj))
-    else:
-        return Quantity(obj)
+        elif all(isinstance(item, str) for item in obj):
+            return Quantity([Quantity(item) for item in obj])
+    return Quantity(obj)
 
 
 class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):

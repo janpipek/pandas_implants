@@ -133,9 +133,6 @@ _all_numeric_reductions = ['sum', 'max', 'min',
 
 @pytest.fixture(params=_all_numeric_reductions)
 def all_numeric_reductions(request):
-    """
-    Fixture for numeric reduction names
-    """
     return request.param
 
 
@@ -145,9 +142,6 @@ _all_boolean_reductions = ['all', 'any']
 
 @pytest.fixture(params=_all_boolean_reductions)
 def all_boolean_reductions(request):
-    """
-    Fixture for boolean reduction names
-    """
     return request.param
 
 
@@ -157,14 +151,20 @@ def box_in_series(request):
     return request.param
 
 
-class TestConstructors(base.BaseConstructorsTests): pass
-
-
 class TestCasting(base.BaseCastingTests):
     def test_compatible_conversion(self):
         s = pd.Series([3, 4], dtype="unit[m]")
         result = s.astype("unit[cm]")
         expected = pd.Series([300, 400], dtype="unit[cm]")
+        self.assert_series_equal(result, expected)
+
+    @pytest.mark.parametrize('generic', [False, True])
+    def test_convert_from_object(self, generic):
+        s = pd.Series([2 * m, 3 * m])
+        dtype = "unit" if generic else "unit[m]"
+        result = s.astype(dtype)
+        expected = pd.Series([2, 3], dtype="unit[m]")
+        self.assert_series_equal(result, expected)
 
 
 class TestDtype(base.BaseDtypeTests): pass
@@ -261,7 +261,13 @@ class TestSetitem(base.BaseSetitemTests):
 
 
 class TestParsing(base.BaseParsingTests):
-    pass
+    @pytest.mark.parametrize('generic', [False, True])
+    def test_series_from_string_list(self, generic):
+        source = ["1 m", "2 m"]
+        dtype = "unit" if generic else "unit[m]"
+        result = pd.Series(source, dtype=dtype)
+        expected = pd.Series([1, 2], dtype="unit[m]")
+        self.assert_series_equal(result, expected)
 
 
 class TestMissing(base.BaseMissingTests):
@@ -307,13 +313,7 @@ class TestArithmeticsOps(base.BaseArithmeticOpsTests):
 
 
 class TestComparisonOps(base.BaseComparisonOpsTests):
-    def teeeest_compare_scalar(self, data, all_compare_operators):
-        op_name = all_compare_operators
-        s = pd.Series(data)
-
-        result_2m = getattr(s, op_name)(2 * m)
-        expected_2m = getattr(data.value, op_name)(2)
-        self.assert_series_equal(result_2m, expected_2m)
+    pass
 
 
 class TestRepr:
