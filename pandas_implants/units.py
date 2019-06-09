@@ -175,7 +175,10 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             return self.__class__(self.value[item], unit=self.unit)
 
     def __setitem__(self, key, value):
-        q = as_quantity(value)
+        if is_scalar(value) and np.isnan(value):
+            q = Quantity(value, self.unit)
+        else:
+            q = as_quantity(value)
         q = convert(q, self.unit)
         self.value[key] = q.value
 
