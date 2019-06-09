@@ -175,9 +175,9 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             return self.__class__(self.value[item], unit=self.unit)
 
     def __setitem__(self, key, value):
-        q = self._to_quantity(value)
-
-
+        q = as_quantity(value)
+        q = convert(q, self.unit)
+        self.value[key] = q.value
 
     def take(self, indices, allow_fill=False, fill_value=None) -> "UnitsExtensionArray":
         if allow_fill:
@@ -232,8 +232,8 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
                     elif op_name in ["__lt__", "__gt__", "__le__", "__ge__"]:
                         raise TypeError
 
-            self_q = cls._to_quantity(self)
-            other_q = cls._to_quantity(other)
+            self_q = as_quantity(self)
+            other_q = as_quantity(other)
             result_q = op(self_q, other_q)
             if coerce_to_dtype:
                 return cls(result_q)
@@ -282,31 +282,31 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
     def _from_factorized(cls, values, original):
         return UnitsExtensionArray(values, original.dtype.unit)
 
-    # value_counts(normalize=False, sort=True, ascending=False, bins=None, dropna=True)
-    def value_counts(self, dropna=True):
-        pass
+    def value_counts(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
+        # TODO: Is it possible to include units? We'd need custom index
+        return pd.Index(self.value).value_counts(normalize, sort, ascending, bins, dropna)
 
 
 @register_series_accessor("units")
 class UnitsSeriesAccessor:
     def __init__(self, obj):
         # Inspired by fletcher
-        if not isinstance(obj.value, UnitsExtensionArray):
+        if not isinstance(obj.array, UnitsExtensionArray):
             raise AttributeError("Only UnitsExtensionArray has units accessor")
         self.obj = obj
 
     @property
     def unit(self):
-        return self.obj.value.unit
+        return self.obj.array.unit
 
     def to(self, unit, equivalencies=None):
         """Convert series to another unit."""
-        new_array = self.obj.value.to(unit, equivalencies)
+        new_array = self.obj.array.to(unit, equivalencies)
         return self.obj.__class__(new_array)
 
     def to_si(self):
         """Convert series to another unit."""
-        unit = self.obj.value.unit
+        unit = self.obj.array.unit
         formatter = Generic()
         formatter._show_scale = False
         new_unit = Unit(formatter.to_string(unit.si))

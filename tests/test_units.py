@@ -116,6 +116,47 @@ def data_missing_for_sorting():
     return UnitsExtensionArray([3, np.nan, 1], "m")
 
 
+@pytest.fixture
+def data_repeated(data):
+    def gen(count):
+        for _ in range(count):
+            yield data
+    return gen
+
+
+# prod forbidden
+# kurt, skew not implemented
+_all_numeric_reductions = ['sum', 'max', 'min',
+                           'mean', 'std', 'var', 'median',]
+                           #'kurt', 'skew']
+
+
+@pytest.fixture(params=_all_numeric_reductions)
+def all_numeric_reductions(request):
+    """
+    Fixture for numeric reduction names
+    """
+    return request.param
+
+
+# These are not implemented
+_all_boolean_reductions = ['all', 'any']
+
+
+@pytest.fixture(params=_all_boolean_reductions)
+def all_boolean_reductions(request):
+    """
+    Fixture for boolean reduction names
+    """
+    return request.param
+
+
+@pytest.fixture(params=[True, False])
+def box_in_series(request):
+    """Whether to box the data in a Series"""
+    return request.param
+
+
 class TestConstructors(base.BaseConstructorsTests): pass
 
 
@@ -156,20 +197,56 @@ class TestMethods(base.BaseMethodsTests):
     pass
 
 
-class TestBooleanReduce(base.BaseBooleanReduceTests):
-    pass
-
-
 class TestReshaping(base.BaseReshapingTests):
+    # Concatenating does not make sense
+    # TODO: Reimplement?
+    # test_concat_mixed_dtypes = None
     pass
 
 
-class TestNoReduce(base.BaseNoReduceTests):
-    pass
+class TestBooleanReduce(base.BaseBooleanReduceTests):
+    def check_reduce(self, s, op_name, skipna):
+        with pytest.raises(TypeError):
+            getattr(s, op_name)(skipna=skipna)
 
 
 class TestNumericReduce(base.BaseNumericReduceTests):
-    pass
+    def check_reduce(self, s, op_name, skipna):
+        # We must check float values
+        result = getattr(s, op_name)(skipna=skipna).value
+        expected = getattr(s.astype('float64'), op_name)(skipna=skipna)
+        tm.assert_almost_equal(result, expected)
+
+    def test_sum(self, data, data_missing):
+        assert pd.Series(data).sum() == 297 * m
+        assert np.isnan(pd.Series(data_missing).sum(skipna=False))
+        assert pd.Series(data_missing).sum() == 1 * m
+
+    def test_mean(self, data):
+        assert np.allclose(pd.Series(data).mean() / m, 2.97)
+
+    def test_min(self, data):
+        assert pd.Series(data).min() == 1 * m
+
+    def test_max(self, data):
+        assert pd.Series(data).max() == 3 * m
+
+    def test_median(self, data):
+        assert pd.Series(data).median() == 3 * m
+
+    def test_std(self, data):
+        assert np.allclose(pd.Series(data).std() / m, 0.2227015)
+
+    def test_sem(self, data):
+        assert np.allclose(pd.Series(data).sem() / m, 0.02227015033536137)
+
+    def test_var(self, data):
+        assert np.allclose(pd.Series(data).var() / (m **2),  0.0495959595959596)
+
+    def test_unsupported(self, data):
+        for method in ["any", "all", "prod"]:
+            with pytest.raises(TypeError):
+                getattr(pd.Series(data), method)()
 
 
 class TestSetitem(base.BaseSetitemTests):
@@ -230,39 +307,6 @@ class TestComparisonOps(base.BaseComparisonOpsTests):
         result_2m = getattr(s, op_name)(2 * m)
         expected_2m = getattr(data.value, op_name)(2)
         self.assert_series_equal(result_2m, expected_2m)
-
-
-class TestReduce:
-    def test_sum(self, data, data_missing):
-        assert pd.Series(data).sum() == 297 * m
-        assert np.isnan(pd.Series(data_missing).sum(skipna=False))
-        assert pd.Series(data_missing).sum() == 1 * m
-
-    def test_mean(self, data):
-        assert np.allclose(pd.Series(data).mean() / m, 2.97)
-
-    def test_min(self, data):
-        assert pd.Series(data).min() == 1 * m
-
-    def test_max(self, data):
-        assert pd.Series(data).max() == 3 * m
-
-    def test_median(self, data):
-        assert pd.Series(data).median() == 3 * m
-
-    def test_std(self, data):
-        assert np.allclose(pd.Series(data).std() / m, 0.2227015)
-
-    def test_sem(self, data):
-        assert np.allclose(pd.Series(data).sem() / m, 0.02227015033536137)
-
-    def test_var(self, data):
-        assert np.allclose(pd.Series(data).var() / (m **2),  0.0495959595959596)
-
-    def test_unsupported(self, data):
-        for method in ["any", "all", "prod"]:
-            with pytest.raises(TypeError):
-                getattr(pd.Series(data), method)()
 
 
 class TestRepr:
