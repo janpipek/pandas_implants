@@ -31,8 +31,8 @@ imperial.enable()
 class UnitsDtype(ExtensionDtype):
     BASE_NAME = "unit"
 
-    type = Quantity
-    kind = "f"
+    type = object
+    kind = "O"
 
     _is_numeric = True
     _metadata = ("unit",)
