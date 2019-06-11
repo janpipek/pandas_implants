@@ -233,9 +233,9 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         # Overriden from the default variant
         # to by-pass conversion to numpy arrays.
         def _invalid_operator():
-            if op_name in ["__eq__", "__ne__"]:
+            if is_equality:
                 return NotImplemented
-            elif op_name in ["__lt__", "__gt__", "__le__", "__ge__"]:
+            else:
                 raise TypeError            
 
         def _binop(self, other):
@@ -244,27 +244,25 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
                 return NotImplemented
 
             elif is_scalar(other):
-                if op_name in [
-                    "__eq__",
-                    "__ne__",
-                    "__lt__",
-                    "__gt__",
-                    "__le__",
-                    "__ge__",
-                ]:
+                if is_comparison:
                     return NotImplemented
 
             elif is_array_like(other):
                 if not isinstance(other.dtype, UnitsDtype):
-                    return _invalid_operator()
+                    if is_comparison:
+                        return _invalid_operator()
 
+            # Convert the thing to quantities
             self_q = as_quantity(self)
             other_q = as_quantity(other)
-            if other.dtype != self.dtype:
-                try:
-                    other_q = convert(other_q, self.unit)
-                except u.UnitConversionError:
-                    return _invalid_operator()
+
+            if is_comparison:
+                # Try apply conversion (we need same type for comparisons)
+                if is_array_like(other) and other.dtype != self.dtype:
+                    try:
+                        other_q = convert(other_q, self.unit)
+                    except u.UnitConversionError:
+                        return _invalid_operator()
 
             result_q = op(self_q, other_q)
             if coerce_to_dtype:
@@ -272,7 +270,14 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             else:
                 return result_q
 
+        # Get info about the operator
         op_name = ops._get_op_name(op, True)
+        is_comparison = op_name in [
+                    "__eq__", "__ne__", "__lt__", "__gt__",
+                    "__le__",  "__ge__",
+                ]
+        is_equality = op_name in ["__eq__", "__ne__"]
+
         return set_function_name(_binop, op_name, cls)
 
     def copy(self, deep=False):
