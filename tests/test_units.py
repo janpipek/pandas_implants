@@ -324,7 +324,6 @@ class TestArithmeticsOps(base.BaseArithmeticOpsTests):
 
 
 class TestComparisonOps(base.BaseComparisonOpsTests):
-    @pytest.mark.skip("Not implemented yet")
     def test_comparable_units(self):
         s1 = pd.Series([1000, 2000, 3000], dtype="unit[m]")
         s2 = pd.Series([1, 2, 3], dtype="unit[km]")
@@ -335,6 +334,23 @@ class TestComparisonOps(base.BaseComparisonOpsTests):
         result = s1 < s3
         expected = pd.Series([False, True, False])
         self.assert_series_equal(expected, result)
+
+    def test_temperature_comparison(self):
+        s1 = pd.Series([0, -10, 10], dtype="unit[deg_C]")
+        s2 = pd.Series([270, 270, 270], dtype="unit[K]")
+
+        result = s1 < s2
+        expected = pd.Series([False, True, False])
+        self.assert_series_equal(expected, result)
+
+    def test_incomparable_units(self):
+        s1 = pd.Series([1000, 2000, 3000], dtype="unit[m]")
+        s2 = pd.Series([1000, 2000, 3000], dtype="unit[s]")
+
+        assert all(s1 != s2)
+
+        with pytest.raises(TypeError):
+            s1 < s2
 
 class TestRepr:
     def test_repr(self, simple_data):

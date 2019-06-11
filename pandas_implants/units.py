@@ -230,8 +230,14 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     @classmethod
     def _create_method(cls, op, coerce_to_dtype=True):
-        # Overloaded from the default variant
+        # Overriden from the default variant
         # to by-pass conversion to numpy arrays.
+        def _invalid_operator():
+            if op_name in ["__eq__", "__ne__"]:
+                return NotImplemented
+            elif op_name in ["__lt__", "__gt__", "__le__", "__ge__"]:
+                raise TypeError            
+
         def _binop(self, other):
             if isinstance(other, (ABCSeries, ABCIndexClass)):
                 # rely on pandas to unbox and dispatch to us
@@ -249,14 +255,17 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
                     return NotImplemented
 
             elif is_array_like(other):
-                if self.dtype != other.dtype:
-                    if op_name in ["__eq__", "__ne__"]:
-                        return NotImplemented
-                    elif op_name in ["__lt__", "__gt__", "__le__", "__ge__"]:
-                        raise TypeError
+                if not isinstance(other.dtype, UnitsDtype):
+                    return _invalid_operator()
 
             self_q = as_quantity(self)
             other_q = as_quantity(other)
+            if other.dtype != self.dtype:
+                try:
+                    other_q = convert(other_q, self.unit)
+                except u.UnitConversionError:
+                    return _invalid_operator()
+
             result_q = op(self_q, other_q)
             if coerce_to_dtype:
                 return cls(result_q)
