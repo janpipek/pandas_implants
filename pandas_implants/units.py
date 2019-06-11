@@ -83,6 +83,8 @@ def as_quantity(obj) -> Quantity:
         return obj
     elif isinstance(obj, UnitsExtensionArray):
         return Quantity(obj.value, obj.unit)
+    elif is_array_like(obj) and obj.dtype == "timedelta64[ns]":
+        return Quantity(obj, "ns").to("s")
     elif is_list_like(obj):
         obj = list(obj)
         if len(obj) == 0:
@@ -166,6 +168,9 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
         if isinstance(dtype, UnitsDtype):
             return _as_units_dtype(dtype.unit)
+        elif dtype == "timedelta64[ns]":
+            nanoseconds = convert(as_quantity(self), "ns")
+            return np.array(nanoseconds.value, dtype="timedelta64[ns]", copy=copy)
         elif dtype in ["O", "object", object]:
             return np.array([x * self.unit for x in self.value], dtype=object)
         elif isinstance(dtype, str):
