@@ -324,8 +324,17 @@ class TestArithmeticsOps(base.BaseArithmeticOpsTests):
 
 
 class TestComparisonOps(base.BaseComparisonOpsTests):
-    pass
+    @pytest.mark.skip("Not implemented yet")
+    def test_comparable_units(self):
+        s1 = pd.Series([1000, 2000, 3000], dtype="unit[m]")
+        s2 = pd.Series([1, 2, 3], dtype="unit[km]")
+        s3 = pd.Series([1, 3, 0], dtype="unit[km]")
+        
+        assert all(s1 == s2)
 
+        result = s1 < s3
+        expected = pd.Series([False, True, False])
+        self.assert_series_equal(expected, result)
 
 class TestRepr:
     def test_repr(self, simple_data):
