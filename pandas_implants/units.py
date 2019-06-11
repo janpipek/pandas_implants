@@ -79,6 +79,7 @@ def convert(q: Quantity, new_unit: Union[str, Unit], equivalencies=None) -> Quan
 
 
 def as_quantity(obj) -> Quantity:
+    """Try to convert whatever input to a Quantity."""
     if isinstance(obj, Quantity):
         return obj
     elif isinstance(obj, UnitsExtensionArray):
@@ -145,7 +146,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         return result
 
     @classmethod
-    def _from_sequence_of_strings(cls, strings, dtype=None, copy=False):
+    def _from_sequence_of_strings(cls, strings, dtype=None, copy=False) -> "UnitsExtensionArray":
         values = [Quantity(s) for s in strings]
         unit = dtype.unit if dtype else None
         return UnitsExtensionArray(values, unit)
@@ -207,7 +208,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         return UnitsExtensionArray(values, self.unit)
 
     @classmethod
-    def _concat_same_type(cls, to_concat):
+    def _concat_same_type(cls, to_concat) -> "UnitsExtensionArray":
         # to_concat = list(to_concat)
         if len(to_concat) == 0:
             return cls([])
@@ -261,7 +262,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         op_name = ops._get_op_name(op, True)
         return set_function_name(_binop, op_name, cls)
 
-    def copy(self, deep=False):
+    def copy(self, deep=False) -> "UnitsExtensionArray":
         return self.__class__(self.value, self.unit, copy=True)
 
     def _reduce(self, name, skipna=True, **kwargs):
@@ -297,10 +298,10 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             raise NotImplementedError
 
     @classmethod
-    def _from_factorized(cls, values, original):
+    def _from_factorized(cls, values, original) -> "UnitsExtensionArray":
         return UnitsExtensionArray(values, original.dtype.unit)
 
-    def value_counts(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True):
+    def value_counts(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True) -> pd.Series:
         # TODO: Is it possible to include units? We'd need custom index
         return pd.Index(self.value).value_counts(normalize, sort, ascending, bins, dropna)
 
@@ -314,15 +315,15 @@ class UnitsSeriesAccessor:
         self.obj = obj
 
     @property
-    def unit(self):
+    def unit(self) -> Unit:
         return self.obj.array.unit
 
-    def to(self, unit, equivalencies=None):
+    def to(self, unit, equivalencies=None) -> pd.Series:
         """Convert series to another unit."""
         new_array = self.obj.array.to(unit, equivalencies)
         return self.obj.__class__(new_array)
 
-    def to_si(self):
+    def to_si(self) -> pd.Series:
         """Convert series to another unit."""
         unit = self.obj.array.unit
         formatter = Generic()
@@ -336,7 +337,8 @@ class UnitsDataFrameAccessor:
     def __init__(self, obj: pd.DataFrame):
         self.obj = obj
 
-    def to_si(self):
+    def to_si(self) -> pd.DataFrame:
+        """Convert all columns that are of unit type to SI."""
         def _f(col):
             try:
                 return col.units.to_si()
