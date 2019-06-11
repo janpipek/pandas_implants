@@ -31,8 +31,8 @@ imperial.enable()
 class UnitsDtype(ExtensionDtype):
     BASE_NAME = "unit"
 
-    type = Quantity
-    kind = "f"
+    type = object
+    kind = "O"
 
     _is_numeric = True
     _metadata = ("unit",)
@@ -84,6 +84,8 @@ def as_quantity(obj) -> Quantity:
         return obj
     elif isinstance(obj, UnitsExtensionArray):
         return Quantity(obj.value, obj.unit)
+    elif is_array_like(obj) and obj.dtype == "timedelta64[ns]":
+        return Quantity(obj, "ns").to("s")
     elif is_list_like(obj):
         obj = list(obj)
         if len(obj) == 0:
@@ -167,6 +169,9 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
         if isinstance(dtype, UnitsDtype):
             return _as_units_dtype(dtype.unit)
+        elif dtype == "timedelta64[ns]":
+            nanoseconds = convert(as_quantity(self), "ns")
+            return np.array(nanoseconds.value, dtype="timedelta64[ns]", copy=copy)
         elif dtype in ["O", "object", object]:
             return np.array([x * self.unit for x in self.value], dtype=object)
         elif isinstance(dtype, str):
@@ -226,40 +231,54 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     @classmethod
     def _create_method(cls, op, coerce_to_dtype=True):
-        # Overloaded from the default variant
+        # Overriden from the default variant
         # to by-pass conversion to numpy arrays.
+        def _invalid_operator():
+            if is_equality:
+                return NotImplemented
+            else:
+                raise TypeError            
+
         def _binop(self, other):
             if isinstance(other, (ABCSeries, ABCIndexClass)):
                 # rely on pandas to unbox and dispatch to us
                 return NotImplemented
 
             elif is_scalar(other):
-                if op_name in [
-                    "__eq__",
-                    "__ne__",
-                    "__lt__",
-                    "__gt__",
-                    "__le__",
-                    "__ge__",
-                ]:
+                if is_comparison:
                     return NotImplemented
 
             elif is_array_like(other):
-                if self.dtype != other.dtype:
-                    if op_name in ["__eq__", "__ne__"]:
-                        return NotImplemented
-                    elif op_name in ["__lt__", "__gt__", "__le__", "__ge__"]:
-                        raise TypeError
+                if not isinstance(other.dtype, UnitsDtype):
+                    if is_comparison:
+                        return _invalid_operator()
 
+            # Convert the thing to quantities
             self_q = as_quantity(self)
             other_q = as_quantity(other)
+
+            if is_comparison:
+                # Try apply conversion (we need same type for comparisons)
+                if is_array_like(other) and other.dtype != self.dtype:
+                    try:
+                        other_q = convert(other_q, self.unit)
+                    except u.UnitConversionError:
+                        return _invalid_operator()
+
             result_q = op(self_q, other_q)
             if coerce_to_dtype:
                 return cls(result_q)
             else:
                 return result_q
 
+        # Get info about the operator
         op_name = ops._get_op_name(op, True)
+        is_comparison = op_name in [
+                    "__eq__", "__ne__", "__lt__", "__gt__",
+                    "__le__",  "__ge__",
+                ]
+        is_equality = op_name in ["__eq__", "__ne__"]
+
         return set_function_name(_binop, op_name, cls)
 
     def copy(self, deep=False) -> "UnitsExtensionArray":

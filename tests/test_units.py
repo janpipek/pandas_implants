@@ -166,6 +166,17 @@ class TestCasting(base.BaseCastingTests):
         expected = pd.Series([2, 3], dtype="unit[m]")
         self.assert_series_equal(result, expected)
 
+    def test_convert_from_timedelta(self):
+        s = pd.Series(pd.timedelta_range(0, periods=3, freq="h"))
+        result = s.astype("unit")
+        expected = pd.Series([0, 3600, 7200], dtype="unit[s]")
+        self.assert_series_equal(result, expected)
+
+    def test_astype_timedelta(self):
+        s = pd.Series([0, 1, 2], dtype="unit[h]")
+        result = s.astype("timedelta64[ns]")
+        expected = pd.Series(pd.timedelta_range(0, periods=3, freq="h"))
+        self.assert_series_equal(result, expected)
 
 class TestDtype(base.BaseDtypeTests): pass
 
@@ -313,8 +324,33 @@ class TestArithmeticsOps(base.BaseArithmeticOpsTests):
 
 
 class TestComparisonOps(base.BaseComparisonOpsTests):
-    pass
+    def test_comparable_units(self):
+        s1 = pd.Series([1000, 2000, 3000], dtype="unit[m]")
+        s2 = pd.Series([1, 2, 3], dtype="unit[km]")
+        s3 = pd.Series([1, 3, 0], dtype="unit[km]")
+        
+        assert all(s1 == s2)
 
+        result = s1 < s3
+        expected = pd.Series([False, True, False])
+        self.assert_series_equal(expected, result)
+
+    def test_temperature_comparison(self):
+        s1 = pd.Series([0, -10, 10], dtype="unit[deg_C]")
+        s2 = pd.Series([270, 270, 270], dtype="unit[K]")
+
+        result = s1 < s2
+        expected = pd.Series([False, True, False])
+        self.assert_series_equal(expected, result)
+
+    def test_incomparable_units(self):
+        s1 = pd.Series([1000, 2000, 3000], dtype="unit[m]")
+        s2 = pd.Series([1000, 2000, 3000], dtype="unit[s]")
+
+        assert all(s1 != s2)
+
+        with pytest.raises(TypeError):
+            s1 < s2
 
 class TestRepr:
     def test_repr(self, simple_data):
