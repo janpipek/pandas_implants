@@ -151,6 +151,10 @@ def box_in_series(request):
     return request.param
 
 
+class TestConstructors(base.BaseConstructorsTests):
+    pass
+
+
 class TestCasting(base.BaseCastingTests):
     def test_compatible_conversion(self):
         s = pd.Series([3, 4], dtype="unit[m]")
