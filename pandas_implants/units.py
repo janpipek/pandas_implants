@@ -337,10 +337,17 @@ class UnitsSeriesAccessor:
     def unit(self) -> Unit:
         return self.obj.array.unit
 
+    def _wrap(self, result: UnitsExtensionArray) -> pd.Series:
+        # The new Series should index and name
+        return self.obj.__class__(
+            result,
+            name=self.obj.name,
+            index=self.obj.index)
+
     def to(self, unit, equivalencies=None) -> pd.Series:
         """Convert series to another unit."""
         new_array = self.obj.array.to(unit, equivalencies)
-        return self.obj.__class__(new_array)
+        return self._wrap(new_array)
 
     def to_si(self) -> pd.Series:
         """Convert series to another unit."""
