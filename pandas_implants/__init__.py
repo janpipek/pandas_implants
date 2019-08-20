@@ -1,3 +1,5 @@
+"""Example extension array in pandas."""
+
 __version__ = "0.0.1"
 
 from .units import (
