@@ -1,6 +1,16 @@
+__all__ = [
+    "as_quantity",
+    "convert",
+    "UnitsDtype",
+    "UnitsExtensionArray",
+    "UnitsSeriesAccessor",
+    "UnitsDataFrameAccessor",
+    "Unit",
+]
+
 import builtins
-import operator
 import re
+import operator
 from typing import Union
 
 import numpy as np
@@ -96,6 +106,8 @@ def as_quantity(obj) -> Quantity:
 
 
 class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
+    """Pandas extension array supporting physical quantities."""
+
     def __init__(
         self, array, unit: Union[None, str, Unit] = None, *, copy: bool = True
     ):
@@ -148,7 +160,9 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         return result
 
     @classmethod
-    def _from_sequence_of_strings(cls, strings, dtype=None, copy=False) -> "UnitsExtensionArray":
+    def _from_sequence_of_strings(
+        cls, strings, dtype=None, copy=False
+    ) -> "UnitsExtensionArray":
         values = [Quantity(s) for s in strings]
         unit = dtype.unit if dtype else None
         return UnitsExtensionArray(values, unit)
@@ -178,7 +192,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             try:
                 dtype = UnitsDtype(dtype)
                 return _as_units_dtype(dtype.unit)
-            except:
+            except Exception:
                 pass
 
         # Fall-back to default variant
@@ -237,7 +251,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             if is_equality:
                 return NotImplemented
             else:
-                raise TypeError            
+                raise TypeError
 
         def _binop(self, other):
             if isinstance(other, (ABCSeries, ABCIndexClass)):
@@ -274,9 +288,13 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         # Get info about the operator
         op_name = ops._get_op_name(op, True)
         is_comparison = op_name in [
-                    "__eq__", "__ne__", "__lt__", "__gt__",
-                    "__le__",  "__ge__",
-                ]
+            "__eq__",
+            "__ne__",
+            "__lt__",
+            "__gt__",
+            "__le__",
+            "__ge__",
+        ]
         is_equality = op_name in ["__eq__", "__ne__"]
 
         return set_function_name(_binop, op_name, cls)
@@ -320,9 +338,13 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
     def _from_factorized(cls, values, original) -> "UnitsExtensionArray":
         return UnitsExtensionArray(values, original.dtype.unit)
 
-    def value_counts(self, normalize=False, sort=True, ascending=False, bins=None, dropna=True) -> pd.Series:
+    def value_counts(
+        self, normalize=False, sort=True, ascending=False, bins=None, dropna=True
+    ) -> pd.Series:
         # TODO: Is it possible to include units? We'd need custom index
-        return pd.Index(self.value).value_counts(normalize, sort, ascending, bins, dropna)
+        return pd.Index(self.value).value_counts(
+            normalize, sort, ascending, bins, dropna
+        )
 
 
 @register_series_accessor("units")
@@ -339,10 +361,7 @@ class UnitsSeriesAccessor:
 
     def _wrap(self, result: UnitsExtensionArray) -> pd.Series:
         # The new Series should index and name
-        return self.obj.__class__(
-            result,
-            name=self.obj.name,
-            index=self.obj.index)
+        return self.obj.__class__(result, name=self.obj.name, index=self.obj.index)
 
     def to(self, unit, equivalencies=None) -> pd.Series:
         """Convert series to another unit."""
@@ -365,6 +384,7 @@ class UnitsDataFrameAccessor:
 
     def to_si(self) -> pd.DataFrame:
         """Convert all columns that are of unit type to SI."""
+
         def _f(col):
             try:
                 return col.units.to_si()
