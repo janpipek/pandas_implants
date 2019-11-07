@@ -316,6 +316,10 @@ class TestArithmeticsOps(base.BaseArithmeticOpsTests):
         expected = pd.Series([1, 4] + 98 * [9], dtype="unit[m^2]")
         self.assert_series_equal(result, expected)
 
+        result2 = s ** (-2)
+        expected2 = pd.Series([1, 1 / 4] + 98 * [1 / 9], dtype="unit[m^(-2)]")
+        self.assert_series_equal(result2, expected2)
+
     def test_error(self, data, all_arithmetic_operators):
         pass
 
