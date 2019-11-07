@@ -8,10 +8,11 @@ __all__ = [
     "Unit",
 ]
 
+from typing import Union
 import builtins
 import re
 import operator
-from typing import Union
+
 
 import numpy as np
 import pandas as pd
@@ -95,7 +96,8 @@ def as_quantity(obj) -> Quantity:
     elif isinstance(obj, UnitsExtensionArray):
         return Quantity(obj.value, obj.unit)
     elif is_array_like(obj) and obj.dtype == "timedelta64[ns]":
-        return Quantity(obj, "ns").to("s")
+        # Note: Timedelta is internally represented as int64
+        return Quantity(np.asarray(obj, dtype=np.int64), "ns").to("s")
     elif is_list_like(obj):
         obj = list(obj)
         if len(obj) == 0:
