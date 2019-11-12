@@ -1,3 +1,7 @@
+"""Extension unit and array for pandas.
+
+It is based on astropy Quantities.
+"""
 __all__ = [
     "as_quantity",
     "convert",
@@ -12,6 +16,7 @@ from typing import Union
 import builtins
 import re
 import operator
+import sys
 
 
 import numpy as np
@@ -38,8 +43,22 @@ from pandas.core.dtypes.generic import ABCIndexClass, ABCSeries
 imperial.enable()
 
 
+class InvalidUnitConversion(ValueError):
+    """The unit cannot be converted to another one."""
+
+
+class InvalidUnit(ValueError):
+    """The unit does not exist."""
+
+
 @register_extension_dtype
 class UnitsDtype(ExtensionDtype):
+    """Description of the units type.
+
+    The name is formed as "unit[.*]" where the inside of the square
+    brackets must be a unit name as understood by astropy units.
+    """
+
     BASE_NAME = "unit"
 
     type = object
@@ -60,7 +79,7 @@ class UnitsDtype(ExtensionDtype):
             return cls()
         match = re.match(f"{cls.BASE_NAME}\\[(?P<name>.*)\\]$", string)
         if not match:
-            raise TypeError(f"Invalid UnitsDtype string: {string}")
+            raise TypeError(f"Invalid UnitsDtype string: '{string}'")
         return cls(match["name"])
 
     @classmethod
@@ -86,7 +105,11 @@ def convert(q: Quantity, new_unit: Union[str, Unit], equivalencies=None) -> Quan
         if q.unit.physical_type == "temperature":
             return q.to(new_unit, u.temperature())
         else:
-            raise
+            raise InvalidUnitConversion(
+                f"Cannot convert unit '{q.unit}' to '{new_unit}'."
+            ) from None
+    except ValueError as err:
+        raise InvalidUnit(f"Unit '{new_unit}' does not exist.") from None
 
 
 def as_quantity(obj) -> Quantity:
@@ -108,7 +131,7 @@ def as_quantity(obj) -> Quantity:
 
 
 class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
-    """Pandas extension array supporting physical quantities."""
+    """Pandas extension array supporting physical quantities with units."""
 
     def __init__(
         self, array, unit: Union[None, str, Unit] = None, *, copy: bool = True
@@ -132,7 +155,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     @property
     def value(self) -> np.ndarray:
-        # Unfortunately, "values" attribute name is prohibited
+        """The numerical values (without unit)."""
         return self._value
 
     @property
@@ -141,17 +164,19 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     @property
     def unit(self) -> Unit:
+        """The unit itself."""
         return self.dtype.unit
 
     def __len__(self) -> int:
         return len(self.value)
 
     def __array__(self, dtype=None) -> np.ndarray:
+        """Implicit conversion to numpy array."""
         return self.value.astype(dtype) if dtype else self.value
 
     @property
     def nbytes(self) -> int:
-        return self.value.nbytes
+        return self.value.nbytes + sys.getsizeof(self.unit)
 
     @classmethod
     def _from_sequence(cls, scalars, dtype=None, copy=False) -> "UnitsExtensionArray":
@@ -170,11 +195,13 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         return UnitsExtensionArray(values, unit)
 
     def to_quantity(self) -> Quantity:
+        """Convert to native Quantity."""
         return as_quantity(self)
 
     def to(
         self, new_unit: Union[str, Unit], equivalencies=None
     ) -> "UnitsExtensionArray":
+        """Convert to another unit (if possible)."""
         q = self.to_quantity()
         new_data = convert(q, new_unit, equivalencies)
         return UnitsExtensionArray(new_data)
@@ -230,6 +257,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     @classmethod
     def _concat_same_type(cls, to_concat) -> "UnitsExtensionArray":
+        print("SAME TYPE")
         # to_concat = list(to_concat)
         if len(to_concat) == 0:
             return cls([])
@@ -331,7 +359,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
             return Quantity(result_without_dim, self.unit)
 
         elif name in to_error:
-            raise TypeError(f"Cannot perform {name} with type {self.dtype}")
+            raise TypeError(f"Cannot perform '{name}' with type '{self.dtype}'")
 
         elif name in to_implement_yet:
             raise NotImplementedError
@@ -351,6 +379,8 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
 @register_series_accessor("units")
 class UnitsSeriesAccessor:
+    """Accessor adding unit functionality to series."""
+
     def __init__(self, obj):
         # Inspired by fletcher
         if not isinstance(obj.array, UnitsExtensionArray):
@@ -359,6 +389,7 @@ class UnitsSeriesAccessor:
 
     @property
     def unit(self) -> Unit:
+        """The Series' unit."""
         return self.obj.array.unit
 
     def _wrap(self, result: UnitsExtensionArray) -> pd.Series:
@@ -371,7 +402,7 @@ class UnitsSeriesAccessor:
         return self._wrap(new_array)
 
     def to_si(self) -> pd.Series:
-        """Convert series to another unit."""
+        """Convert series to a relevant SI unit."""
         unit = self.obj.array.unit
         formatter = Generic()
         formatter._show_scale = False
@@ -381,6 +412,8 @@ class UnitsSeriesAccessor:
 
 @register_dataframe_accessor("units")
 class UnitsDataFrameAccessor:
+    """Accessor adding unit functionality to data frames."""
+
     def __init__(self, obj: pd.DataFrame):
         self.obj = obj
 
