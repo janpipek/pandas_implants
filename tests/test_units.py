@@ -8,6 +8,7 @@ from astropy.units import Unit
 from astropy.units import UnitConversionError
 from pandas.tests.extension import base
 from pandas.tests.extension.base import BaseOpsUtil
+from pandas.tests.extension.base.base import BaseExtensionTests
 from pandas.tests.extension.conftest import *
 
 from pandas_implants.units import UnitsDtype
@@ -435,3 +436,28 @@ class TestUnitsDataFrameAccessor(BaseOpsUtil):
             }
         )
         self.assert_frame_equal(result, expected)
+
+
+class TestVarious(BaseExtensionTests):
+    @pytest.mark.skip("Don't know how to implement this correctly.")
+    def test_concat_incompatible(self):
+        s1 = pd.Series(["1 m"], dtype="unit")
+        s2 = pd.Series(["1 ft"], dtype="unit")
+        concatenated = pd.concat([s1.units, s2.units]).reset_index(drop=True)
+        expected = pd.Series(["1 m", "0.3048 m"], dtype="unit")
+        self.assert_series_equal(expected, concatenated)
+        # :-( Returns converted to float.
+
+    @pytest.mark.skip("Don't know how to implement this correctly.")
+    def test_add_new_value_with_different_unit(self):
+        s1 = pd.Series(["1 m"], dtype="unit")
+        s1.at[1] = Quantity("1 ft")
+        expected = pd.Series(["1.0 m", "0.3048 m"], dtype="unit")
+        self.assert_series_equal(expected, s1)
+        # :-( Returns converted to float.
+
+    def test_set_value_with_different_unit(self):
+        s1 = pd.Series(["1 m"], dtype="unit")
+        s1[0] = Quantity("1 ft")
+        expected = pd.Series(["0.3048 m"], dtype="unit")
+        self.assert_series_equal(expected, s1)
