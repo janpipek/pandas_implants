@@ -97,6 +97,9 @@ class UnitsDtype(ExtensionDtype):
 def convert(q: Quantity, new_unit: Union[str, Unit], equivalencies=None) -> Quantity:
     """Convert quantity to a new unit.
 
+    :raises InvalidUnit: When target unit does not exist.
+    :raises InvalidUnitConversion: If the conversion is invalid.
+
     Customized to be a bit more universal than the original quantities.
     """
     try:
@@ -207,6 +210,8 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         return UnitsExtensionArray(new_data)
 
     def astype(self, dtype, copy=True):
+        """Convert to a different dtype."""
+
         def _as_units_dtype(unit):
             return self.to(unit)
 
@@ -228,6 +233,10 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         return ExtensionArray.astype(self, dtype, copy=copy)
 
     def _formatter(self, boxed=False):
+        """Formatter to always include unit name in the output.
+
+        TODO: Not sure if this is the best (differ on boxed?)
+        """
         return lambda x: (str(x) if isinstance(x, Quantity) else f"{x} {self.unit}")
 
     def __getitem__(self, item):
@@ -247,6 +256,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         self.value[key] = q.value
 
     def take(self, indices, allow_fill=False, fill_value=None) -> "UnitsExtensionArray":
+        """Integer-based selection of items."""
         if allow_fill:
             if fill_value is None or np.isnan(fill_value):
                 fill_value = np.nan
@@ -257,13 +267,13 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
 
     @classmethod
     def _concat_same_type(cls, to_concat) -> "UnitsExtensionArray":
-        print("SAME TYPE")
-        # to_concat = list(to_concat)
+        # TODO: This does not work for similar types.
         if len(to_concat) == 0:
             return cls([])
         elif len(to_concat) == 1:
             return to_concat[0]
         elif len(set(item.unit for item in to_concat)) != 1:
+            # TODO: And this actually never happens.
             raise ValueError("Not all concatenated arrays have the same units.")
         else:
             return cls(
@@ -333,6 +343,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         return self.__class__(self.value, self.unit, copy=True)
 
     def _reduce(self, name, skipna=True, **kwargs):
+        """Implementation of pandas basic reduce methods."""
         # Borrowed from IntegerArray
 
         to_proxy = ["min", "max", "sum", "mean", "std", "var"]
@@ -384,7 +395,7 @@ class UnitsSeriesAccessor:
     def __init__(self, obj):
         # Inspired by fletcher
         if not isinstance(obj.array, UnitsExtensionArray):
-            raise AttributeError("Only UnitsExtensionArray has units accessor")
+            raise AttributeError("Only UnitsExtensionArray has units accessor.")
         self.obj = obj
 
     @property
