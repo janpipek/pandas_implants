@@ -1,6 +1,19 @@
 """Extension unit and array for pandas.
 
 It is based on astropy Quantities.
+
+Examples
+--------
+    >>> pd.Series([1, 2, 3], dtype="unit[m]")
+    0   1.0 m
+    1   2.0 m
+    2   3.0 m
+    dtype: unit[m]
+
+    >>> pd.Series([123, 21], dtype="unit[km]") / pd.Series([1, 3], dtype="unit[hour]")
+    0   123.0 km / h
+    1     7.0 km / h
+    dtype: unit[km / h]
 """
 __all__ = [
     "as_quantity",
@@ -12,12 +25,11 @@ __all__ = [
     "Unit",
 ]
 
-from typing import Union
+from typing import Any, Union
 import builtins
 import re
 import operator
 import sys
-
 
 import numpy as np
 import pandas as pd
@@ -40,6 +52,7 @@ from pandas.core import ops
 from pandas.core.algorithms import take
 from pandas.core.dtypes.generic import ABCIndexClass, ABCSeries
 
+# Imperial units enabled by default
 imperial.enable()
 
 
@@ -61,10 +74,10 @@ class UnitsDtype(ExtensionDtype):
 
     BASE_NAME = "unit"
 
-    type = object
+    type = Quantity
     kind = "O"
 
-    _is_numeric = True
+    _is_numeric = False
     _metadata = ("unit",)
 
     def __init__(self, unit=None):
@@ -84,6 +97,7 @@ class UnitsDtype(ExtensionDtype):
 
     @classmethod
     def construct_array_type(cls) -> builtins.type:
+        """Associated extension array."""
         return UnitsExtensionArray
 
     @property
@@ -115,7 +129,7 @@ def convert(q: Quantity, new_unit: Union[str, Unit], equivalencies=None) -> Quan
         raise InvalidUnit(f"Unit '{new_unit}' does not exist.") from None
 
 
-def as_quantity(obj) -> Quantity:
+def as_quantity(obj: Any) -> Quantity:
     """Try to convert whatever input to a Quantity."""
     if isinstance(obj, Quantity):
         return obj
@@ -162,13 +176,13 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         return self._value
 
     @property
-    def dtype(self) -> UnitsDtype:
-        return self._dtype
-
-    @property
     def unit(self) -> Unit:
         """The unit itself."""
         return self.dtype.unit
+
+    @property
+    def dtype(self) -> UnitsDtype:
+        return self._dtype
 
     def __len__(self) -> int:
         return len(self.value)
@@ -201,6 +215,10 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         """Convert to native Quantity."""
         return as_quantity(self)
 
+    def unique(self) -> "UnitsExtensionArray":
+        """Unique values."""
+        return self.__class__(pd.unique(self.value), unit=self.unit)
+
     def to(
         self, new_unit: Union[str, Unit], equivalencies=None
     ) -> "UnitsExtensionArray":
@@ -209,7 +227,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         new_data = convert(q, new_unit, equivalencies)
         return UnitsExtensionArray(new_data)
 
-    def astype(self, dtype, copy=True):
+    def astype(self, dtype, copy: bool = True):
         """Convert to a different dtype."""
 
         def _as_units_dtype(unit):
@@ -232,7 +250,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
         # Fall-back to default variant
         return ExtensionArray.astype(self, dtype, copy=copy)
 
-    def _formatter(self, boxed=False):
+    def _formatter(self, boxed: bool = False):
         """Formatter to always include unit name in the output.
 
         TODO: Not sure if this is the best (differ on boxed?)
@@ -316,7 +334,7 @@ class UnitsExtensionArray(ExtensionArray, ExtensionScalarOpsMixin):
                 if is_array_like(other) and other.dtype != self.dtype:
                     try:
                         other_q = convert(other_q, self.unit)
-                    except u.UnitConversionError:
+                    except InvalidUnitConversion:
                         return _invalid_operator()
 
             result_q = op(self_q, other_q)
@@ -404,7 +422,7 @@ class UnitsSeriesAccessor:
         return self.obj.array.unit
 
     def _wrap(self, result: UnitsExtensionArray) -> pd.Series:
-        # The new Series should index and name
+        """Construct a series with different data but same index and name."""
         return self.obj.__class__(result, name=self.obj.name, index=self.obj.index)
 
     def to(self, unit, equivalencies=None) -> pd.Series:

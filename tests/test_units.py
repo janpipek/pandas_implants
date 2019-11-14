@@ -461,3 +461,10 @@ class TestVarious(BaseExtensionTests):
         s1[0] = Quantity("1 ft")
         expected = pd.Series(["0.3048 m"], dtype="unit")
         self.assert_series_equal(expected, s1)
+
+    def test_unique(self):
+        s = Series([1, np.nan, np.nan], dtype="unit[m]")
+        unique = s.unique()
+        expected = UnitsExtensionArray([1, np.nan], unit="m")
+        assert unique.unit == expected.unit
+        np.testing.assert_equal(expected.value, unique.value)
