@@ -1,7 +1,11 @@
 # pandas_implants
-Experimental types for pandas
+
+Examples for extending pandas.
 
 Used at PyCon CZ 2019
+
+**Note:** The current version of the units extension type can be found
+in the https://github.com/janpipek/pandas-units-extension repo.
 
 ## Requirements
 
